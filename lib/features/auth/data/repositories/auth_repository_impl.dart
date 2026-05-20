@@ -86,10 +86,38 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<UserEntity?> getUserProfile(String userId) async {
     try {
       final data = await _authService.getUserProfile(userId);
-      if (data == null) return null;
+      if (data == null) return _fallbackEntity(userId);
       return UserEntity.fromJson(data);
-    } catch (e) {
-      throw app_exceptions.ServerException('Failed to load user profile');
+    } catch (_) {
+      // DB unreachable or RLS blocked — still show the profile using
+      // auth metadata so authenticated users never see "Not logged in".
+      return _fallbackEntity(userId);
+    }
+  }
+
+  // Constructs a minimal UserEntity from auth.currentUser metadata.
+  // Used when the profiles table row is missing or inaccessible.
+  UserEntity? _fallbackEntity(String userId) {
+    final authUser = _authService.currentUser;
+    if (authUser == null || authUser.id != userId) return null;
+    final meta = authUser.userMetadata ?? {};
+    final email = authUser.email ?? '';
+    final now = DateTime.now().toIso8601String();
+    try {
+      return UserEntity.fromJson({
+        'id': userId,
+        'full_name': meta['full_name'] as String? ?? email.split('@').first,
+        'email': email,
+        'phone': meta['phone'] as String?,
+        'avatar_url': null,
+        'location': null,
+        'role': 'buyer',
+        'is_verified': false,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } catch (_) {
+      return null;
     }
   }
 

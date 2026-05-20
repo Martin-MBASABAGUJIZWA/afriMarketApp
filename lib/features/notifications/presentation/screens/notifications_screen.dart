@@ -3,44 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
-import 'package:afrimarket/core/services/supabase_service.dart';
 import 'package:afrimarket/features/auth/presentation/providers/auth_providers.dart';
-
-final notificationsProvider =
-    FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final userId = ref.watch(authStateProvider).value?.id;
-  if (userId == null || !SupabaseService.isInitialized) return [];
-  try {
-    final res = await SupabaseService.client
-        .from('notifications')
-        .select()
-        .eq('user_id', userId)
-        .order('created_at', ascending: false)
-        .limit(50);
-    return List<Map<String, dynamic>>.from(res);
-  } catch (_) {
-    return [];
-  }
-});
+import 'package:afrimarket/features/notifications/domain/entities/notification_entity.dart';
+import 'package:afrimarket/features/notifications/presentation/providers/notification_provider.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
-
-  Future<void> _markAllRead(String userId) async {
-    if (!SupabaseService.isInitialized) return;
-    try {
-      await SupabaseService.client
-          .from('notifications')
-          .update({'is_read': true})
-          .eq('user_id', userId)
-          .eq('is_read', false);
-    } catch (_) {}
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final notificationsAsync = ref.watch(notificationsProvider);
     final userId = ref.watch(authStateProvider).value?.id;
+    final notifRepo = ref.read(notificationRepositoryProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surfaceColor,
@@ -57,8 +31,9 @@ class NotificationsScreen extends ConsumerWidget {
           if (userId != null)
             TextButton(
               onPressed: () async {
-                await _markAllRead(userId);
+                await notifRepo.markAllAsRead(userId);
                 ref.invalidate(notificationsProvider);
+                ref.invalidate(unreadNotificationCountProvider);
               },
               child: Text(
                 'Mark all read',
@@ -82,13 +57,10 @@ class NotificationsScreen extends ConsumerWidget {
               return _NotificationCard(
                 notification: n,
                 onTap: () async {
-                  if (!(n['is_read'] as bool? ?? false)) {
-                    try {
-                      await SupabaseService.client
-                          .from('notifications')
-                          .update({'is_read': true}).eq('id', n['id']);
-                      ref.invalidate(notificationsProvider);
-                    } catch (_) {}
+                  if (!n.isRead) {
+                    await notifRepo.markAsRead(n.id);
+                    ref.invalidate(notificationsProvider);
+                    ref.invalidate(unreadNotificationCountProvider);
                   }
                 },
               );
@@ -98,14 +70,15 @@ class NotificationsScreen extends ConsumerWidget {
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppTheme.primaryGreen),
         ),
-        error: (e, _) => Center(child: Text('Error loading notifications')),
+        error: (e, _) =>
+            const Center(child: Text('Error loading notifications')),
       ),
     );
   }
 }
 
 class _NotificationCard extends StatelessWidget {
-  final Map<String, dynamic> notification;
+  final NotificationEntity notification;
   final VoidCallback onTap;
 
   const _NotificationCard({
@@ -115,27 +88,18 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRead = notification['is_read'] as bool? ?? false;
-    final title = notification['title'] as String? ?? '';
-    final body = notification['body'] as String? ??
-        notification['message'] as String? ?? '';
-    final type = notification['type'] as String? ?? 'info';
-    final createdAt = notification['created_at'] != null
-        ? DateTime.tryParse(notification['created_at'] as String)
-        : null;
-
     IconData icon;
     Color color;
-    switch (type) {
-      case 'order':
+    switch (notification.type) {
+      case NotificationType.order:
         icon = Icons.shopping_bag_outlined;
         color = AppTheme.accentOrange;
         break;
-      case 'payment':
+      case NotificationType.payment:
         icon = Icons.payment_outlined;
         color = const Color(0xFF9C27B0);
         break;
-      case 'promo':
+      case NotificationType.promo:
         icon = Icons.local_offer_outlined;
         color = const Color(0xFF1E88E5);
         break;
@@ -144,20 +108,9 @@ class _NotificationCard extends StatelessWidget {
         color = AppTheme.primaryGreen;
     }
 
-    String timeLabel = '';
-    if (createdAt != null) {
-      final diff = DateTime.now().difference(createdAt);
-      if (diff.inMinutes < 60) {
-        timeLabel = '${diff.inMinutes}m ago';
-      } else if (diff.inHours < 24) {
-        timeLabel = '${diff.inHours}h ago';
-      } else {
-        timeLabel = '${diff.inDays}d ago';
-      }
-    }
-
     return Material(
-      color: isRead ? Colors.white : const Color(0xFFF1F8E9),
+      color:
+          notification.isRead ? Colors.white : const Color(0xFFF1F8E9),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -167,7 +120,7 @@ class _NotificationCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isRead
+              color: notification.isRead
                   ? const Color(0xFFE0E0E0)
                   : AppTheme.primaryGreen.withOpacity(0.3),
             ),
@@ -193,17 +146,17 @@ class _NotificationCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            title,
+                            notification.title,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              fontWeight: isRead
+                              fontWeight: notification.isRead
                                   ? FontWeight.w500
                                   : FontWeight.w700,
                               color: AppTheme.textPrimary,
                             ),
                           ),
                         ),
-                        if (!isRead)
+                        if (!notification.isRead)
                           Container(
                             width: 8,
                             height: 8,
@@ -214,10 +167,10 @@ class _NotificationCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    if (body.isNotEmpty) ...[
+                    if (notification.body.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        body,
+                        notification.body,
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           color: AppTheme.textSecondary,
@@ -225,16 +178,14 @@ class _NotificationCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (timeLabel.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        timeLabel,
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: AppTheme.textTertiary,
-                        ),
+                    const SizedBox(height: 6),
+                    Text(
+                      notification.timeAgo,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppTheme.textTertiary,
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),

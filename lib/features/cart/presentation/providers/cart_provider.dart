@@ -3,31 +3,29 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:afrimarket/features/marketplace/domain/entities/product_entity.dart';
 import 'package:afrimarket/features/auth/presentation/providers/auth_providers.dart';
 import 'package:afrimarket/features/cart/data/datasources/cart_data_source.dart';
+import 'package:afrimarket/features/cart/data/repositories/cart_repository_impl.dart';
+import 'package:afrimarket/features/cart/domain/entities/cart_item_entity.dart';
+import 'package:afrimarket/features/cart/domain/repositories/cart_repository.dart';
 import 'package:afrimarket/core/services/supabase_service.dart';
 
-class CartItem {
-  final ProductEntity product;
-  final int quantity;
-
-  const CartItem({required this.product, this.quantity = 1});
-
-  CartItem copyWith({int? quantity}) =>
-      CartItem(product: product, quantity: quantity ?? this.quantity);
-
-  double get totalPrice => product.price * quantity;
-}
+// Re-export for convenience so existing code using CartItem still compiles.
+typedef CartItem = CartItemEntity;
 
 final _cartDataSourceProvider =
     Provider<CartDataSource>((ref) => CartDataSource());
 
-class CartNotifier extends Notifier<List<CartItem>> {
+final cartRepositoryProvider = Provider<CartRepository>((ref) {
+  return CartRepositoryImpl(ref.read(_cartDataSourceProvider));
+});
+
+class CartNotifier extends Notifier<List<CartItemEntity>> {
   @override
-  List<CartItem> build() {
+  List<CartItemEntity> build() {
     ref.listen<AsyncValue<User?>>(authStateProvider, (prev, next) {
       final userId = next.value?.id;
       final prevId = prev?.value?.id;
       if (userId != null && userId != prevId) {
-        Future.microtask(() => _loadFromSupabase(userId));
+        Future.microtask(() => _loadFromRepository(userId));
       } else if (userId == null) {
         state = [];
       }
@@ -35,29 +33,16 @@ class CartNotifier extends Notifier<List<CartItem>> {
 
     final userId = ref.read(authStateProvider).value?.id;
     if (userId != null) {
-      Future.microtask(() => _loadFromSupabase(userId));
+      Future.microtask(() => _loadFromRepository(userId));
     }
     return [];
   }
 
-  Future<void> _loadFromSupabase(String userId) async {
+  Future<void> _loadFromRepository(String userId) async {
     if (!SupabaseService.isInitialized) return;
     try {
-      final rows = await ref.read(_cartDataSourceProvider).getCartItems(userId);
-      final items = <CartItem>[];
-      for (final row in rows) {
-        final productMap = row['products'];
-        if (productMap != null) {
-          try {
-            final product = ProductEntity.fromJson(
-                Map<String, dynamic>.from(productMap as Map));
-            items.add(CartItem(
-              product: product,
-              quantity: (row['quantity'] as num).toInt(),
-            ));
-          } catch (_) {}
-        }
-      }
+      final items =
+          await ref.read(cartRepositoryProvider).getCartItems(userId);
       state = items;
     } catch (_) {}
   }
@@ -65,7 +50,7 @@ class CartNotifier extends Notifier<List<CartItem>> {
   String? get _userId => ref.read(authStateProvider).value?.id;
 
   void addItem(ProductEntity product) {
-    final index = state.indexWhere((i) => i.product.id == product.id);
+    final index = state.indexWhere((i) => i.productId == product.id);
     int newQty;
     if (index >= 0) {
       newQty = state[index].quantity + 1;
@@ -75,19 +60,19 @@ class CartNotifier extends Notifier<List<CartItem>> {
       ];
     } else {
       newQty = 1;
-      state = [...state, CartItem(product: product)];
+      state = [...state, CartItemEntity(product: product)];
     }
     final uid = _userId;
     if (uid != null) {
-      ref.read(_cartDataSourceProvider).upsertItem(uid, product.id, newQty);
+      ref.read(cartRepositoryProvider).addItem(uid, product, newQty);
     }
   }
 
   void removeItem(String productId) {
-    state = state.where((i) => i.product.id != productId).toList();
+    state = state.where((i) => i.productId != productId).toList();
     final uid = _userId;
     if (uid != null) {
-      ref.read(_cartDataSourceProvider).removeItem(uid, productId);
+      ref.read(cartRepositoryProvider).removeItem(uid, productId);
     }
   }
 
@@ -95,7 +80,7 @@ class CartNotifier extends Notifier<List<CartItem>> {
     int newQty = 1;
     state = [
       for (final item in state)
-        if (item.product.id == productId)
+        if (item.productId == productId)
           () {
             newQty = item.quantity + 1;
             return item.copyWith(quantity: newQty);
@@ -105,15 +90,17 @@ class CartNotifier extends Notifier<List<CartItem>> {
     ];
     final uid = _userId;
     if (uid != null) {
-      ref.read(_cartDataSourceProvider).upsertItem(uid, productId, newQty);
+      ref
+          .read(cartRepositoryProvider)
+          .updateQuantity(uid, productId, newQty);
     }
   }
 
   void decreaseQuantity(String productId) {
-    final List<CartItem> next = [];
+    final List<CartItemEntity> next = [];
     int newQty = 0;
     for (final item in state) {
-      if (item.product.id == productId) {
+      if (item.productId == productId) {
         if (item.quantity > 1) {
           newQty = item.quantity - 1;
           next.add(item.copyWith(quantity: newQty));
@@ -127,11 +114,9 @@ class CartNotifier extends Notifier<List<CartItem>> {
     state = next;
     final uid = _userId;
     if (uid != null) {
-      if (newQty == 0) {
-        ref.read(_cartDataSourceProvider).removeItem(uid, productId);
-      } else {
-        ref.read(_cartDataSourceProvider).upsertItem(uid, productId, newQty);
-      }
+      ref
+          .read(cartRepositoryProvider)
+          .updateQuantity(uid, productId, newQty);
     }
   }
 
@@ -139,7 +124,7 @@ class CartNotifier extends Notifier<List<CartItem>> {
     state = [];
     final uid = _userId;
     if (uid != null) {
-      await ref.read(_cartDataSourceProvider).clearCart(uid);
+      await ref.read(cartRepositoryProvider).clearCart(uid);
     }
   }
 
@@ -150,4 +135,4 @@ class CartNotifier extends Notifier<List<CartItem>> {
 }
 
 final cartProvider =
-    NotifierProvider<CartNotifier, List<CartItem>>(CartNotifier.new);
+    NotifierProvider<CartNotifier, List<CartItemEntity>>(CartNotifier.new);

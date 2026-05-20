@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
 import 'package:afrimarket/core/services/supabase_service.dart';
 import 'package:afrimarket/features/auth/presentation/providers/auth_providers.dart';
-import 'package:afrimarket/features/notifications/presentation/screens/notifications_screen.dart';
+import 'package:afrimarket/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:afrimarket/features/marketplace/presentation/providers/favorites_provider.dart';
 import 'package:afrimarket/features/orders/presentation/providers/order_provider.dart';
 
@@ -43,10 +43,8 @@ class _ProfileBody extends ConsumerWidget {
     final favoriteIds = ref.watch(favoritesProvider);
     final ordersAsync = ref.watch(buyerOrdersProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
-    final unreadCount = notificationsAsync.value
-            ?.where((n) => !(n['is_read'] as bool? ?? false))
-            .length ??
-        0;
+    final unreadCount =
+        notificationsAsync.value?.where((n) => !n.isRead).length ?? 0;
     final orderCount = ordersAsync.value?.length ?? 0;
     final role = user.role as String? ?? 'buyer';
 

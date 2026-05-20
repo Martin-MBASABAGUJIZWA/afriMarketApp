@@ -60,12 +60,10 @@ class _OrderSummaryScreenState extends ConsumerState<OrderSummaryScreen> {
       // Group items by seller
       final Map<String, List<CartItem>> bySeller = {};
       for (final item in items) {
-        bySeller
-            .putIfAbsent(item.product.sellerId, () => [])
-            .add(item);
+        bySeller.putIfAbsent(item.sellerId, () => []).add(item);
       }
 
-      final orderDs = ref.read(orderDataSourceProvider);
+      final orderRepo = ref.read(orderRepositoryProvider);
 
       for (final entry in bySeller.entries) {
         final sellerId = entry.key;
@@ -77,15 +75,15 @@ class _OrderSummaryScreenState extends ConsumerState<OrderSummaryScreen> {
 
         final orderItems = sellerItems
             .map((i) => {
-                  'product_id': i.product.id,
-                  'product_name': i.product.name,
-                  'product_price': i.product.price,
+                  'product_id': i.productId,
+                  'product_name': i.productName,
+                  'product_price': i.unitPrice,
                   'quantity': i.quantity,
                   'subtotal': i.totalPrice,
                 })
             .toList();
 
-        await orderDs.createOrder(
+        await orderRepo.createOrder(
           buyerId: userId,
           sellerId: sellerId,
           paymentMethod: _selectedPayment,

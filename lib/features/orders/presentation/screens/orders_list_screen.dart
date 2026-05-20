@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
+import 'package:afrimarket/features/orders/domain/entities/order_entity.dart';
+import 'package:afrimarket/features/orders/domain/entities/order_status.dart';
 import 'package:afrimarket/features/orders/presentation/providers/order_provider.dart';
 
 class OrdersListScreen extends ConsumerWidget {
@@ -72,8 +74,7 @@ class OrdersListScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(20),
             itemCount: orders.length,
             itemBuilder: (context, index) {
-              final order = orders[index];
-              return _OrderCard(order: order);
+              return _OrderCard(order: orders[index]);
             },
           );
         },
@@ -103,20 +104,12 @@ class OrdersListScreen extends ConsumerWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  final Map<String, dynamic> order;
+  final OrderEntity order;
 
   const _OrderCard({required this.order});
 
   @override
   Widget build(BuildContext context) {
-    final status = order['status'] as String? ?? 'pending';
-    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
-    final createdAt = order['created_at'] != null
-        ? DateTime.tryParse(order['created_at'] as String)
-        : null;
-    final items =
-        (order['order_items'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -134,44 +127,40 @@ class _OrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Order #${(order['id'] as String).substring(0, 8).toUpperCase()}',
+                'Order #${order.id.substring(0, 8).toUpperCase()}',
                 style: GoogleFonts.poppins(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.textPrimary),
               ),
-              _StatusBadge(status: status),
+              _StatusBadge(status: order.status),
             ],
           ),
-          if (createdAt != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              _formatDate(createdAt),
-              style: GoogleFonts.poppins(
-                  fontSize: 12, color: AppTheme.textSecondary),
-            ),
-          ],
+          const SizedBox(height: 4),
+          Text(
+            _formatDate(order.createdAt),
+            style: GoogleFonts.poppins(
+                fontSize: 12, color: AppTheme.textSecondary),
+          ),
           const Divider(height: 20),
-          // Items
-          ...items.map((item) => Padding(
+          ...order.items.map((item) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
-                        '${item['product_name']} ×${item['quantity']}',
+                        '${item.productName} ×${item.quantity}',
                         style: GoogleFonts.poppins(
                             fontSize: 13, color: AppTheme.textSecondary),
                       ),
                     ),
                     Text(
-                      '${(item['subtotal'] as num?)?.toStringAsFixed(0) ?? '0'} RWF',
+                      '${item.subtotal.toStringAsFixed(0)} RWF',
                       style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -189,7 +178,7 @@ class _OrderCard extends StatelessWidget {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary)),
-              Text('${total.toStringAsFixed(0)} RWF',
+              Text(order.formattedTotal,
                   style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -203,7 +192,7 @@ class _OrderCard extends StatelessWidget {
                   size: 14, color: AppTheme.textSecondary),
               const SizedBox(width: 4),
               Text(
-                _paymentLabel(order['payment_method'] as String? ?? ''),
+                order.paymentMethod.label,
                 style: GoogleFonts.poppins(
                     fontSize: 12, color: AppTheme.textSecondary),
               ),
@@ -216,68 +205,62 @@ class _OrderCard extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${dt.day} ${months[dt.month]} ${dt.year} · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _paymentLabel(String method) {
-    switch (method) {
-      case 'mtn':
-        return 'MTN MoMo';
-      case 'airtel':
-        return 'Airtel Money';
-      case 'cash':
-        return 'Cash on Delivery';
-      default:
-        return method;
-    }
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  final String status;
+  final OrderStatus status;
   const _StatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
     Color bg;
     Color fg;
-    String label;
 
     switch (status) {
-      case 'pending':
+      case OrderStatus.pending:
         bg = const Color(0xFFFFF3E0);
         fg = const Color(0xFFE65100);
-        label = 'Pending';
         break;
-      case 'confirmed':
+      case OrderStatus.confirmed:
         bg = const Color(0xFFE3F2FD);
         fg = const Color(0xFF1565C0);
-        label = 'Confirmed';
         break;
-      case 'completed':
+      case OrderStatus.completed:
+      case OrderStatus.delivered:
         bg = const Color(0xFFE8F5E9);
         fg = AppTheme.primaryGreen;
-        label = 'Completed';
         break;
-      case 'cancelled':
+      case OrderStatus.cancelled:
+      case OrderStatus.refunded:
         bg = Colors.red.shade50;
         fg = Colors.red.shade700;
-        label = 'Cancelled';
         break;
       default:
         bg = const Color(0xFFF5F5F5);
         fg = AppTheme.textSecondary;
-        label = status;
     }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration:
           BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(label,
+      child: Text(status.label,
           style: GoogleFonts.poppins(
               fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
     );

@@ -7,6 +7,8 @@ import 'package:afrimarket/core/services/supabase_service.dart';
 import 'package:afrimarket/features/seller/presentation/providers/seller_providers.dart';
 import 'package:afrimarket/features/marketplace/presentation/providers/marketplace_providers.dart';
 import 'package:afrimarket/features/orders/presentation/providers/order_provider.dart';
+import 'package:afrimarket/features/orders/domain/entities/order_entity.dart';
+import 'package:afrimarket/features/orders/domain/entities/order_status.dart';
 
 class SellerDashboardScreen extends ConsumerStatefulWidget {
   const SellerDashboardScreen({super.key});
@@ -672,39 +674,33 @@ class _ProductListItem extends StatelessWidget {
 }
 
 class _RealOrderListItem extends StatelessWidget {
-  final Map<String, dynamic> order;
+  final OrderEntity order;
 
   const _RealOrderListItem({required this.order});
 
   @override
   Widget build(BuildContext context) {
-    final status = order['status'] as String? ?? 'pending';
-    final total = (order['total'] as num?)?.toDouble() ?? 0.0;
-    final orderId = (order['id'] as String? ?? '').substring(0, 8).toUpperCase();
-    final createdAt = order['created_at'] != null
-        ? DateTime.tryParse(order['created_at'] as String)
-        : null;
+    final orderId = order.id.substring(0, 8).toUpperCase();
 
     Color statusColor;
-    switch (status) {
-      case 'confirmed':
+    switch (order.status) {
+      case OrderStatus.confirmed:
         statusColor = const Color(0xFF1E88E5);
         break;
-      case 'completed':
+      case OrderStatus.completed:
+      case OrderStatus.delivered:
         statusColor = AppTheme.primaryGreen;
         break;
-      case 'cancelled':
+      case OrderStatus.cancelled:
+      case OrderStatus.refunded:
         statusColor = Colors.red;
         break;
       default:
         statusColor = AppTheme.accentOrange;
     }
 
-    String dateLabel = '';
-    if (createdAt != null) {
-      const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      dateLabel = '${createdAt.day} ${months[createdAt.month]}';
-    }
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final dateLabel = '${order.createdAt.day} ${months[order.createdAt.month]}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -733,16 +729,15 @@ class _RealOrderListItem extends StatelessWidget {
               children: [
                 Text('Order #$orderId',
                   style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                if (dateLabel.isNotEmpty)
-                  Text(dateLabel,
-                    style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
+                Text(dateLabel,
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppTheme.textSecondary)),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${total.toStringAsFixed(0)} RWF',
+              Text(order.formattedTotal,
                 style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.primaryGreen)),
               const SizedBox(height: 4),
               Container(
@@ -752,7 +747,7 @@ class _RealOrderListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  status[0].toUpperCase() + status.substring(1),
+                  order.status.label,
                   style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor),
                 ),
               ),

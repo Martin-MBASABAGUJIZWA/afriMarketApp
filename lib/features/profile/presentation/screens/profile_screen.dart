@@ -387,6 +387,7 @@ class _ProfileBody extends ConsumerWidget {
                         await ref
                             .read(authNotifierProvider.notifier)
                             .signOut();
+                        if (context.mounted) context.go('/login');
                       }
                     },
                   ),

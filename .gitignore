@@ -28,7 +28,14 @@ migrate_working_dir/
 .packages
 .pub-cache/
 .pub/
-/build/
+# Exclude native build outputs — keep build/web for Vercel deployment
+/build/linux/
+/build/android/
+/build/ios/
+/build/macos/
+/build/windows/
+# CanvasKit served from Google CDN — no need to commit 32 MB of WASM
+/build/web/canvaskit/
 
 # Symbolication related
 app.*.symbols

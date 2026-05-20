@@ -95,7 +95,7 @@ class _DesktopDashboard extends ConsumerWidget {
       body: SingleChildScrollView(
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: r.isWide ? 1440 : 1240),
+            constraints: BoxConstraints(maxWidth: r.maxContentWidth),
             child: Padding(
               padding: EdgeInsets.all(r.h),
               child: Row(

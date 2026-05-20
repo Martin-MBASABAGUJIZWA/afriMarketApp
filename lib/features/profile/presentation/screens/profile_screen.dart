@@ -178,7 +178,7 @@ class _DesktopProfile extends ConsumerWidget {
         padding: EdgeInsets.symmetric(horizontal: r.h, vertical: 28),
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1240),
+            constraints: BoxConstraints(maxWidth: r.maxContentWidth),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

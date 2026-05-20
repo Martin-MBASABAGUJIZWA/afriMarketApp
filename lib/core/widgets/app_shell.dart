@@ -136,12 +136,12 @@ class _MobileShell extends StatelessWidget {
         items: items
             .map((item) => BottomNavigationBarItem(
                   icon: _NavBadge(
-                    child: Icon(item.icon, size: 26),
                     count: item.badge,
+                    child: Icon(item.icon, size: 26),
                   ),
                   activeIcon: _NavBadge(
-                    child: Icon(item.activeIcon, size: 26),
                     count: item.badge,
+                    child: Icon(item.activeIcon, size: 26),
                   ),
                   label: item.label,
                 ))
@@ -191,26 +191,34 @@ class _TabletShell extends StatelessWidget {
               color: Colors.grey.shade500,
               fontSize: 11,
             ),
-            leading: Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 8),
+            leading: const Padding(
+              padding: EdgeInsets.only(top: 16, bottom: 8),
               child: _BrandMark(compact: true),
             ),
             destinations: items
                 .map((item) => NavigationRailDestination(
                       icon: _NavBadge(
-                        child: Icon(item.icon),
                         count: item.badge,
+                        child: Icon(item.icon),
                       ),
                       selectedIcon: _NavBadge(
-                        child: Icon(item.activeIcon),
                         count: item.badge,
+                        child: Icon(item.activeIcon),
                       ),
                       label: Text(item.label),
                     ))
                 .toList(),
           ),
           const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: shell),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: Responsive.of(context).shellContentMaxWidth),
+                child: shell,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -238,7 +246,9 @@ class _DesktopShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final r = Responsive.of(context);
     return Scaffold(
+      backgroundColor: const Color(0xFFF1F3F5),
       body: Row(
         children: [
           SizedBox(
@@ -250,7 +260,15 @@ class _DesktopShell extends StatelessWidget {
             ),
           ),
           const VerticalDivider(width: 1, thickness: 1),
-          Expanded(child: shell),
+          Expanded(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: r.shellContentMaxWidth),
+                child: shell,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -347,6 +365,7 @@ class _SidebarTile extends StatelessWidget {
             child: Row(
               children: [
                 _NavBadge(
+                  count: badge,
                   child: Icon(
                     selected ? activeIcon : icon,
                     size: 22,
@@ -354,7 +373,6 @@ class _SidebarTile extends StatelessWidget {
                         ? AppTheme.primaryGreen
                         : Colors.grey.shade600,
                   ),
-                  count: badge,
                 ),
                 const SizedBox(width: 14),
                 Expanded(

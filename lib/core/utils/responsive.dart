@@ -23,12 +23,21 @@ class Responsive {
   bool get isDesktop => width >= ScreenSize.md;
   bool get isWide => width >= ScreenSize.xl;
 
-  // Caller wraps content in a Center + ConstrainedBox with this width
+  // Max width for per-screen content containers (sidebar already excluded
+  // from available width before these values are applied).
   double get maxContentWidth {
-    if (width >= ScreenSize.xl) return 1480.0;
-    if (width >= ScreenSize.lg) return 1240.0;
-    if (width >= ScreenSize.md) return double.infinity;
+    if (width >= ScreenSize.xl) return 1200.0; // 1600+ viewport
+    if (width >= ScreenSize.lg) return 1000.0; // 1280–1600 viewport
+    if (width >= ScreenSize.md) return 840.0;  // 960–1280 viewport
     return double.infinity;
+  }
+
+  // Hard cap on the shell content column itself (right of sidebar).
+  // Screens that don't use PageContainer are still bounded by this.
+  double get shellContentMaxWidth {
+    if (width >= ScreenSize.xl) return 1400.0;
+    if (width >= ScreenSize.lg) return 1120.0;
+    return double.infinity; // tablet / mobile — fill available space
   }
 
   // Horizontal padding for the page body

@@ -107,7 +107,7 @@ class _DesktopCart extends ConsumerWidget {
           : SingleChildScrollView(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: r.isWide ? 1280 : 1080),
+                  constraints: BoxConstraints(maxWidth: r.maxContentWidth),
                   child: Padding(
                     padding: EdgeInsets.all(r.h),
                     child: Row(

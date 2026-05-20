@@ -21,14 +21,55 @@ class ProfileScreen extends ConsumerWidget {
       body: currentUser.when(
         data: (user) {
           if (user == null) {
-            return const Center(child: Text('Not logged in'));
+            // User is authenticated but profile row is missing or still being
+            // created. Retry once automatically.
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(
+                      color: AppTheme.primaryGreen),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Setting up your profile…',
+                    style: GoogleFonts.poppins(
+                        color: AppTheme.textSecondary, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => ref.invalidate(currentUserProvider),
+                    child: Text('Retry',
+                        style: GoogleFonts.poppins(
+                            color: AppTheme.primaryGreen,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            );
           }
           return _ProfileBody(user: user);
         },
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppTheme.primaryGreen),
         ),
-        error: (_, __) => const Center(child: Text('Error loading profile')),
+        error: (_, __) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Could not load profile',
+                  style:
+                      GoogleFonts.poppins(color: AppTheme.textSecondary)),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => ref.invalidate(currentUserProvider),
+                child: Text('Retry',
+                    style: GoogleFonts.poppins(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

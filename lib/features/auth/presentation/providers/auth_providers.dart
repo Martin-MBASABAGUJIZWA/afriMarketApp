@@ -28,11 +28,14 @@ final authStateProvider = StreamProvider<User?>((ref) async* {
 });
 
 final currentUserProvider = FutureProvider<UserEntity?>((ref) async {
-  final repository = ref.watch(authRepositoryProvider);
-  final userId = repository.currentUserId;
+  // Re-fetch whenever auth session changes (login, logout, session restore).
+  final sessionUser = ref.watch(authStateProvider).value;
+  final notifierUser = ref.watch(authNotifierProvider).value;
+  final userId = sessionUser?.id ?? notifierUser?.id;
 
   if (userId == null) return null;
 
+  final repository = ref.read(authRepositoryProvider);
   try {
     return await repository.getUserProfile(userId);
   } catch (_) {

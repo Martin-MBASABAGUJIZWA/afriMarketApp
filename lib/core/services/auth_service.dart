@@ -155,13 +155,34 @@ class AuthService {
 
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     try {
-      final response = await _client
+      var response = await _client
           .from('profiles')
           .select()
           .eq('id', userId)
-          .maybeSingle(); // maybeSingle returns null instead of throwing when row missing
+          .maybeSingle();
 
-      if (response == null) return null;
+      // No profile row yet — auto-create from auth user metadata so the
+      // profile screen never shows "Not logged in" for a valid session.
+      if (response == null) {
+        final authUser = _client.auth.currentUser;
+        if (authUser == null) return null;
+        final meta = authUser.userMetadata ?? {};
+        final email = authUser.email ?? '';
+        final fullName =
+            meta['full_name'] as String? ?? email.split('@').first;
+        await _upsertUserProfile(
+          userId: userId,
+          email: email,
+          fullName: fullName,
+          phone: meta['phone'] as String?,
+        );
+        response = await _client
+            .from('profiles')
+            .select()
+            .eq('id', userId)
+            .maybeSingle();
+        if (response == null) return null;
+      }
 
       // Guarantee non-null timestamps so UserEntity.fromJson never crashes.
       final now = DateTime.now().toIso8601String();

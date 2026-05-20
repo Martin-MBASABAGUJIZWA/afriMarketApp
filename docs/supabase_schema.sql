@@ -486,6 +486,67 @@ CREATE POLICY "audit: service insert"    ON public.audit_logs FOR INSERT WITH CH
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', FALSE);
 
 -- ============================================================
+-- STORAGE BUCKET POLICIES — 'products' bucket
+-- Apply in: Supabase Dashboard → Storage → products → Policies
+-- ============================================================
+-- The 'products' bucket stores product images uploaded by sellers.
+-- Images are stored at path: {seller_auth_uid}/{timestamp}.{ext}
+-- This path prefix enables per-seller RLS on storage.
+
+-- 1. Public read — anyone (including guests) can view product images
+CREATE POLICY "products bucket: public read"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'products');
+
+-- 2. Authenticated insert — any logged-in user (seller) can upload
+CREATE POLICY "products bucket: authenticated insert"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'products'
+    AND auth.role() = 'authenticated'
+  );
+
+-- 3. Owner delete — sellers can only delete images they uploaded
+--    (first path segment must match their auth UID)
+CREATE POLICY "products bucket: owner delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'products'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- 4. Owner update — sellers can only update their own images
+CREATE POLICY "products bucket: owner update"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'products'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- ============================================================
+-- STORAGE BUCKET POLICIES — 'avatars' bucket
+-- ============================================================
+-- Images stored at: {user_auth_uid}/{timestamp}.{ext}
+
+CREATE POLICY "avatars bucket: public read"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "avatars bucket: owner insert"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "avatars bucket: owner delete"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'avatars'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+-- ============================================================
 -- SEED: default categories
 -- ============================================================
 INSERT INTO public.categories (name, slug, icon, sort_order) VALUES

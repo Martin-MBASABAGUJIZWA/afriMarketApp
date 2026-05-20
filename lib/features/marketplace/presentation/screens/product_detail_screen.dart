@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
 import 'package:afrimarket/core/services/supabase_service.dart';
 import 'package:afrimarket/features/marketplace/presentation/providers/marketplace_providers.dart';
@@ -46,25 +47,12 @@ class ProductDetailScreen extends ConsumerWidget {
           }
           return CustomScrollView(
             slivers: [
-              // Product Image Header
-              SliverAppBar(
-                expandedHeight: 300,
-                pinned: true,
-                backgroundColor: AppTheme.primaryGreen,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => context.pop(),
-                ),
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    color: const Color(0xFFE8F5E9),
-                    child: Center(
-                      child: Text(
-                        _getProductEmoji(product.name),
-                        style: const TextStyle(fontSize: 120),
-                      ),
-                    ),
-                  ),
+              // Product Image Gallery Header
+              SliverToBoxAdapter(
+                child: _ProductImageGallery(
+                  imageUrls: product.imageUrls,
+                  productName: product.name,
+                  onBack: () => context.pop(),
                 ),
               ),
 
@@ -258,8 +246,202 @@ class ProductDetailScreen extends ConsumerWidget {
     );
   }
 
-  String _getProductEmoji(String productName) {
-    return _emojiForName(productName);
+}
+
+// ──────────────────────────────────────────────────────────
+// Product image gallery with swipeable PageView
+// ──────────────────────────────────────────────────────────
+
+class _ProductImageGallery extends StatefulWidget {
+  final List<String> imageUrls;
+  final String productName;
+  final VoidCallback onBack;
+
+  const _ProductImageGallery({
+    required this.imageUrls,
+    required this.productName,
+    required this.onBack,
+  });
+
+  @override
+  State<_ProductImageGallery> createState() => _ProductImageGalleryState();
+}
+
+class _ProductImageGalleryState extends State<_ProductImageGallery> {
+  final _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final urls = widget.imageUrls;
+    final hasImages = urls.isNotEmpty;
+
+    return SizedBox(
+      height: 320,
+      child: Stack(
+        children: [
+          // Image content
+          hasImages
+              ? PageView.builder(
+                  controller: _pageController,
+                  itemCount: urls.length,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  itemBuilder: (context, i) => CachedNetworkImage(
+                    imageUrl: urls[i],
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 320,
+                    placeholder: (_, __) => Container(
+                      color: AppTheme.primaryGreen.withOpacity(0.08),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: AppTheme.primaryGreen,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => _ImagePlaceholder(
+                      productName: widget.productName,
+                    ),
+                  ),
+                )
+              : _ImagePlaceholder(productName: widget.productName),
+
+          // Top gradient for back button legibility
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 100,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Back button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 8,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onBack,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.35),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Page indicator dots (only for multiple images)
+          if (urls.length > 1)
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  urls.length,
+                  (i) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: _currentPage == i ? 20 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: _currentPage == i
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Image count badge
+          if (urls.length > 1)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 12,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentPage + 1}/${urls.length}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImagePlaceholder extends StatelessWidget {
+  final String productName;
+  const _ImagePlaceholder({required this.productName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFE8F5E9),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _emojiForName(productName),
+              style: const TextStyle(fontSize: 96),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              productName,
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryGreen.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

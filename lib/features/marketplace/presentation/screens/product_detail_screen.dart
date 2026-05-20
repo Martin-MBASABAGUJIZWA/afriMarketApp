@@ -160,7 +160,7 @@ class ProductDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                       // Reviews Section
-                      _ReviewsSection(productId: productId),
+                      _ReviewsSection(productId: productId, sellerId: product.sellerId),
                       const SizedBox(height: 100),
                     ],
                   ),
@@ -460,8 +460,9 @@ String _emojiForName(String productName) {
 
 class _ReviewsSection extends ConsumerStatefulWidget {
   final String productId;
+  final String sellerId;
 
-  const _ReviewsSection({required this.productId});
+  const _ReviewsSection({required this.productId, required this.sellerId});
 
   @override
   ConsumerState<_ReviewsSection> createState() => _ReviewsSectionState();
@@ -487,12 +488,31 @@ class _ReviewsSectionState extends ConsumerState<_ReviewsSection> {
 
     setState(() => _submitting = true);
     try {
-      await SupabaseService.client.from('reviews').upsert({
-        'product_id': widget.productId,
-        'user_id': userId,
-        'rating': _selectedRating,
-        'comment': comment,
-      }, onConflict: 'product_id,user_id');
+      // Check whether this user already reviewed this product.
+      // Avoids ON CONFLICT which requires the DB unique constraint to exist.
+      final existing = await SupabaseService.client
+          .from('reviews')
+          .select('id')
+          .eq('product_id', widget.productId)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        await SupabaseService.client.from('reviews').update({
+          'rating': _selectedRating,
+          'comment': comment,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', existing['id'] as String);
+      } else {
+        await SupabaseService.client.from('reviews').insert({
+          'product_id': widget.productId,
+          'user_id': userId,
+          'seller_id': widget.sellerId,
+          'rating': _selectedRating,
+          'comment': comment,
+        });
+      }
+
       _commentController.clear();
       setState(() {
         _showForm = false;
@@ -503,7 +523,11 @@ class _ReviewsSectionState extends ConsumerState<_ReviewsSection> {
       setState(() => _submitting = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to submit review: $e')),
+          SnackBar(
+            content: Text('Failed to submit review: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }

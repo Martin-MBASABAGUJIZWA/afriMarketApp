@@ -70,4 +70,57 @@ class MarketplaceRepositoryImpl implements MarketplaceRepository {
       throw app_exceptions.ServerException('Failed to search products');
     }
   }
+
+  @override
+  Future<void> createProduct({
+    required String sellerId,
+    required String name,
+    required String categoryId,
+    required double price,
+    required int stockQuantity,
+    String? description,
+    String unit = 'each',
+    List<String> imageUrls = const [],
+  }) {
+    return _dataSource.createProduct(
+      sellerId: sellerId,
+      name: name,
+      categoryId: categoryId,
+      price: price,
+      stockQuantity: stockQuantity,
+      description: description,
+      unit: unit,
+      imageUrls: imageUrls,
+    );
+  }
+
+  @override
+  Future<void> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    double? price,
+    int? stockQuantity,
+    String? categoryId,
+    String? unit,
+    List<String>? imageUrls,
+    bool? isDeleted,
+  }) {
+    return _dataSource.updateProduct(
+      productId: productId,
+      name: name,
+      description: description,
+      price: price,
+      stockQuantity: stockQuantity,
+      categoryId: categoryId,
+      unit: unit,
+      imageUrls: imageUrls,
+      isDeleted: isDeleted,
+    );
+  }
+
+  @override
+  Future<void> deleteProduct(String productId) {
+    return _dataSource.deleteProduct(productId);
+  }
 }

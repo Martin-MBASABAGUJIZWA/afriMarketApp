@@ -173,4 +173,74 @@ class MarketplaceDataSource {
       throw app_exceptions.ServerException('Failed to search products');
     }
   }
+
+  Future<void> createProduct({
+    required String sellerId,
+    required String name,
+    required String categoryId,
+    required double price,
+    required int stockQuantity,
+    String? description,
+    String unit = 'each',
+    List<String> imageUrls = const [],
+  }) async {
+    try {
+      await _client.from(DatabaseTables.products).insert({
+        'seller_id': sellerId,
+        'name': name,
+        'category_id': categoryId,
+        'price': price,
+        'stock_quantity': stockQuantity,
+        if (description != null && description.isNotEmpty)
+          'description': description,
+        'unit': unit,
+        'image_urls': imageUrls,
+      });
+    } catch (e) {
+      throw app_exceptions.ServerException('Failed to create product');
+    }
+  }
+
+  Future<void> updateProduct({
+    required String productId,
+    String? name,
+    String? description,
+    double? price,
+    int? stockQuantity,
+    String? categoryId,
+    String? unit,
+    List<String>? imageUrls,
+    bool? isDeleted,
+  }) async {
+    try {
+      final updates = <String, dynamic>{};
+      if (name != null) updates['name'] = name;
+      if (description != null) updates['description'] = description;
+      if (price != null) updates['price'] = price;
+      if (stockQuantity != null) updates['stock_quantity'] = stockQuantity;
+      if (categoryId != null) updates['category_id'] = categoryId;
+      if (unit != null) updates['unit'] = unit;
+      if (imageUrls != null) updates['image_urls'] = imageUrls;
+      if (isDeleted == true) {
+        updates['deleted_at'] = DateTime.now().toIso8601String();
+      }
+      if (updates.isEmpty) return;
+      await _client
+          .from(DatabaseTables.products)
+          .update(updates)
+          .eq('id', productId);
+    } catch (e) {
+      throw app_exceptions.ServerException('Failed to update product');
+    }
+  }
+
+  Future<void> deleteProduct(String productId) async {
+    try {
+      await _client.from(DatabaseTables.products).update({
+        'deleted_at': DateTime.now().toIso8601String(),
+      }).eq('id', productId);
+    } catch (e) {
+      throw app_exceptions.ServerException('Failed to delete product');
+    }
+  }
 }

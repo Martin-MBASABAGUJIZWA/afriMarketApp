@@ -41,8 +41,7 @@ class _BecomeSellerScreenState extends ConsumerState<BecomeSellerScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final dataSource = ref.read(sellerDataSourceProvider);
-      await dataSource.createSeller(
+      await ref.read(sellerRepositoryProvider).createSeller(
         userId: userId,
         businessName: _businessNameController.text.trim(),
         category: _selectedCategory.toLowerCase(),

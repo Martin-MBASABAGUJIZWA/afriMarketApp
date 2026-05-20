@@ -98,18 +98,18 @@ class _AddProductScreenState extends ConsumerState<AddProductScreen> {
           } catch (_) {}
         }
 
-        await SupabaseService.client.from('products').insert({
-          'seller_id': seller.id,
-          'name': _nameController.text.trim(),
-          'description': _descController.text.trim().isEmpty
+        await ref.read(marketplaceRepositoryProvider).createProduct(
+          sellerId: seller.id,
+          name: _nameController.text.trim(),
+          categoryId: _selectedCategory!.id,
+          price: double.parse(_priceController.text.trim()),
+          stockQuantity: int.parse(_stockController.text.trim()),
+          description: _descController.text.trim().isEmpty
               ? null
               : _descController.text.trim(),
-          'category_id': _selectedCategory!.id,
-          'price': double.parse(_priceController.text.trim()),
-          'unit': _selectedUnit,
-          'stock_quantity': int.parse(_stockController.text.trim()),
-          'image_urls': imageUrls,
-        });
+          unit: _selectedUnit,
+          imageUrls: imageUrls,
+        );
       }
 
       if (mounted) {

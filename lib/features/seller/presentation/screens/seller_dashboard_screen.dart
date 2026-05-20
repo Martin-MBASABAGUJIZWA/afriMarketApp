@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
-import 'package:afrimarket/core/services/supabase_service.dart';
 import 'package:afrimarket/features/seller/presentation/providers/seller_providers.dart';
 import 'package:afrimarket/features/marketplace/presentation/providers/marketplace_providers.dart';
 import 'package:afrimarket/features/orders/presentation/providers/order_provider.dart';
@@ -141,7 +140,7 @@ class _DashboardBody extends ConsumerWidget {
                             const SizedBox(width: 8),
                             IconButton(
                               icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                              onPressed: () {},
+                              onPressed: () => context.push('/notifications'),
                             ),
                           ],
                         ),
@@ -983,16 +982,14 @@ class _EditProductSheetState extends ConsumerState<_EditProductSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      if (SupabaseService.isInitialized) {
-        final updates = <String, dynamic>{
-          'name': _nameCtrl.text.trim(),
-          'price': double.parse(_priceCtrl.text.trim()),
-          'stock_quantity': int.parse(_stockCtrl.text.trim()),
-        };
-        final desc = _descCtrl.text.trim();
-        if (desc.isNotEmpty) updates['description'] = desc;
-        await SupabaseService.client.from('products').update(updates).eq('id', widget.product.id);
-      }
+      final desc = _descCtrl.text.trim();
+      await ref.read(marketplaceRepositoryProvider).updateProduct(
+        productId: widget.product.id,
+        name: _nameCtrl.text.trim(),
+        price: double.parse(_priceCtrl.text.trim()),
+        stockQuantity: int.parse(_stockCtrl.text.trim()),
+        description: desc.isEmpty ? null : desc,
+      );
       ref.invalidate(sellerProductsProvider(widget.sellerId));
       ref.invalidate(featuredProductsProvider);
       if (mounted) {

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:afrimarket/core/theme/app_theme.dart';
-import 'package:afrimarket/core/services/supabase_service.dart';
+import 'package:afrimarket/features/auth/domain/entities/user_entity.dart';
 import 'package:afrimarket/features/auth/presentation/providers/auth_providers.dart';
 import 'package:afrimarket/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:afrimarket/features/marketplace/presentation/providers/favorites_provider.dart';
@@ -35,7 +35,7 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileBody extends ConsumerWidget {
-  final dynamic user;
+  final UserEntity user;
   const _ProfileBody({required this.user});
 
   @override
@@ -46,7 +46,7 @@ class _ProfileBody extends ConsumerWidget {
     final unreadCount =
         notificationsAsync.value?.where((n) => !n.isRead).length ?? 0;
     final orderCount = ordersAsync.value?.length ?? 0;
-    final role = user.role as String? ?? 'buyer';
+    final role = user.role;
 
     Color roleColor;
     IconData roleIcon;
@@ -181,7 +181,7 @@ class _ProfileBody extends ConsumerWidget {
                       style: GoogleFonts.poppins(
                           fontSize: 13, color: AppTheme.textSecondary),
                     ),
-                    if (user.phone != null && (user.phone as String).isNotEmpty) ...[
+                    if (user.phone != null && (user.phone!).isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -198,7 +198,7 @@ class _ProfileBody extends ConsumerWidget {
                       ),
                     ],
                     if (user.location != null &&
-                        (user.location as String).isNotEmpty) ...[
+                        (user.location!).isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -323,7 +323,7 @@ class _ProfileBody extends ConsumerWidget {
                     icon: Icons.location_on_outlined,
                     title: 'My Address',
                     subtitle: (user.location != null &&
-                            (user.location as String).isNotEmpty)
+                            (user.location!).isNotEmpty)
                         ? user.location
                         : 'Add delivery address',
                     onTap: () => _showAddressSheet(context, ref, user),
@@ -571,10 +571,10 @@ class _MenuItem extends StatelessWidget {
 
 // ─── Edit Profile Dialog ───────────────────────────────────
 Future<void> _showEditProfileDialog(
-    BuildContext context, WidgetRef ref, dynamic user) async {
-  final nameController = TextEditingController(text: user.fullName as String);
+    BuildContext context, WidgetRef ref, UserEntity user) async {
+  final nameController = TextEditingController(text: user.fullName);
   final phoneController =
-      TextEditingController(text: user.phone as String? ?? '');
+      TextEditingController(text: user.phone ?? '');
   bool saving = false;
 
   await showDialog(
@@ -621,15 +621,12 @@ Future<void> _showEditProfileDialog(
                     if (name.isEmpty) return;
                     setState(() => saving = true);
                     try {
-                      final updates = <String, dynamic>{
-                        'full_name': name,
-                      };
                       final phone = phoneController.text.trim();
-                      if (phone.isNotEmpty) updates['phone'] = phone;
-                      await SupabaseService.client
-                          .from('profiles')
-                          .update(updates)
-                          .eq('id', user.id as String);
+                      await ref.read(authRepositoryProvider).updateUserProfile(
+                            userId: user.id,
+                            fullName: name,
+                            phone: phone.isEmpty ? null : phone,
+                          );
                       ref.invalidate(currentUserProvider);
                       if (ctx.mounted) {
                         Navigator.pop(ctx);
@@ -671,9 +668,9 @@ Future<void> _showEditProfileDialog(
 
 // ─── Address Sheet ─────────────────────────────────────────
 Future<void> _showAddressSheet(
-    BuildContext context, WidgetRef ref, dynamic user) async {
+    BuildContext context, WidgetRef ref, UserEntity user) async {
   final controller =
-      TextEditingController(text: user.location as String? ?? '');
+      TextEditingController(text: user.location ?? '');
   bool saving = false;
 
   await showModalBottomSheet(
@@ -771,10 +768,12 @@ Future<void> _showAddressSheet(
                         final address = controller.text.trim();
                         setState(() => saving = true);
                         try {
-                          await SupabaseService.client
-                              .from('profiles')
-                              .update({'location': address})
-                              .eq('id', user.id as String);
+                          await ref
+                              .read(authRepositoryProvider)
+                              .updateUserProfile(
+                                userId: user.id,
+                                location: address.isEmpty ? null : address,
+                              );
                           ref.invalidate(currentUserProvider);
                           if (ctx.mounted) {
                             Navigator.pop(ctx);
@@ -817,7 +816,7 @@ Future<void> _showAddressSheet(
 }
 
 // ─── Payment Methods Sheet ──────────────────────────────────
-void _showPaymentSheet(BuildContext context, dynamic user) {
+void _showPaymentSheet(BuildContext context, UserEntity user) {
   showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
